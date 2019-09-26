@@ -4,6 +4,7 @@
 
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_TFTLCD.h> // Hardware-specific library
+#include <SD.h>
 
 // The control pins for the LCD can be assigned to any digital or
 // analog pins...but we'll use the analog pins as this allows us to
@@ -14,6 +15,8 @@
 #define LCD_RD A0 // LCD Read goes to Analog 0
 
 #define LCD_RESET A4 // Can alternately just connect to Arduino's reset pin
+
+const int chipSelect = 10;  // sdcard chip select
 
 // Assign human-readable names to some common 16-bit color values:
 #define	BLACK   0x0000
@@ -30,10 +33,16 @@ Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
 void push(int *ary, int arysize);
 unsigned long makegraph(uint16_t color, int *ary, int setsize);
+void screen_setup(uint16_t backgroundColor, uint16_t penColor, int height, int width, int margin1, int margin2);
+void graph_erase_data(uint16_t penColor, int x1, int x2, int y1, int y2);
+int fileExists(char buffer[10]);
+
+
 int debug = 1;
 int plottimer;          // I use this to time how long plot takes and subtract that from the sample time.
 
 void setup(void) {
+
   Serial.begin(9600);
   Serial.println(F("TFT LCD test"));
 
@@ -71,16 +80,24 @@ void setup(void) {
     return;
   }
   tft.begin(identifier);
+
+  if (!SD.begin(chipSelect))
+  {
+    Serial.println("Card failure!");
+  }
 }
 
 void loop(void) {
-  int setsize = 20;                   // this determines how many samples are displayed on the screen
+  int setsize = 56;                   // this determines how many samples are displayed on the screen
   int dataset[setsize];
   int data_index = 0;
   int counter;
+  int filename;
+  char namebuffer[10];
+  filename = sprintf(namebuffer, "data.txt");
   for (counter = 0; counter < setsize; counter++)
     dataset[counter] = 0;
-  int sample_speed = 3000;            // this determines sample frequency in uS: should be >300mS because of plot speed
+  int sample_speed = 1500;            // this determines sample frequency in uS: should be >300mS because of plot speed
   while(1)
   {
     // get ADC measurement
@@ -89,7 +106,9 @@ void loop(void) {
     // enter into array
     push(dataset, setsize);             // shift all elements in array over one
     dataset[0] = measurement;           // add new element to array
-    
+    File dataFile = SD.open(namebuffer, FILE_WRITE);
+    dataFile.println(measurement);
+    dataFile.close();
     // plot
     makegraph(BLACK, dataset, setsize);  // graph it
     if (debug) { 
@@ -160,8 +179,20 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
     }
   }
   /* 0,0 is the bottom left corner */
+  plottimer = millis() - scratch;
+}
+
+void screen_setup(uint16_t backgroundColor, uint16_t penColor, int height, int width, int margin1, int margin2)
+{
+
+  width = tft.width(), height = tft.height();
+  tft.fillScreen(backgroundColor);
+  tft.setRotation(2);
+  tft.drawLine(margin1, height - margin2, margin1, margin2, penColor);
+  tft.drawLine(margin1, margin2,  width - margin1, margin2, penColor);
+    
   tft.setCursor( 60,5);
-  tft.setTextColor(color);
+  tft.setTextColor(penColor);
   tft.setTextSize(2);
   tft.println("voltage");
   
@@ -169,5 +200,19 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
   tft.setCursor(60, 220);
   tft.println("time");
   tft.setRotation(2);
-  plottimer = millis() - scratch;
 }
+
+void graph_erase_data(uint16_t penColor, int x1, int x2, int y1, int y2)
+{
+  tft.fillRect(x1, y1, x2, y2, penColor);
+}
+
+int fileExists(char buffer[10])
+{
+  FILE *fp;
+  if((fp = fopen(buffer, "r")) == NULL)
+    return(0);
+  fclose(fp);
+  return(1);
+}
+
