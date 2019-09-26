@@ -5,29 +5,6 @@
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_TFTLCD.h> // Hardware-specific library
 
-// The control pins for the LCD can be assigned to any digital or
-// analog pins...but we'll use the analog pins as this allows us to
-// double up the pins with the touch screen (see the TFT paint example).
-#define LCD_CS A3 // Chip Select goes to Analog 3
-#define LCD_CD A2 // Command/Data goes to Analog 2
-#define LCD_WR A1 // LCD Write goes to Analog 1
-#define LCD_RD A0 // LCD Read goes to Analog 0
-
-#define LCD_RESET A4 // Can alternately just connect to Arduino's reset pin
-
-// When using the BREAKOUT BOARD only, use these 8 data lines to the LCD:
-// For the Arduino Uno, Duemilanove, Diecimila, etc.:
-//   D0 connects to digital pin 8  (Notice these are
-//   D1 connects to digital pin 9   NOT in order!)
-//   D2 connects to digital pin 2
-//   D3 connects to digital pin 3
-//   D4 connects to digital pin 4
-//   D5 connects to digital pin 5
-//   D6 connects to digital pin 6
-//   D7 connects to digital pin 7
-// For the Arduino Mega, use digital pins 22 through 29
-// (on the 2-row header at the end of the board).
-
 // Assign human-readable names to some common 16-bit color values:
 #define	BLACK   0x0000
 #define	BLUE    0x001F
@@ -39,10 +16,6 @@
 #define WHITE   0xFFFF
 
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
-// If using the shield, all control and data lines are fixed, and
-// a simpler declaration can optionally be used:
-// Adafruit_TFTLCD tft;
-
 
 void push(int *ary, int arysize);
 unsigned long makegraph(uint16_t color, int *ary, int setsize);
@@ -50,12 +23,6 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize);
 void setup(void) {
   Serial.begin(9600);
   Serial.println(F("TFT LCD test"));
-
-#ifdef USE_ADAFRUIT_SHIELD_PINOUT
-  Serial.println(F("Using Adafruit 2.8\" TFT Arduino Shield Pinout"));
-#else
-  Serial.println(F("Using Adafruit 2.8\" TFT Breakout Board Pinout"));
-#endif
 
   Serial.print("TFT size is "); Serial.print(tft.width()); Serial.print("x"); Serial.println(tft.height());
 
@@ -88,7 +55,7 @@ void setup(void) {
 }
 
 void loop(void) {
-  int setsize = 57;
+  int setsize = 20;
   int dataset[setsize];
   int data_index = 0;
   int counter;
@@ -98,18 +65,12 @@ void loop(void) {
   while(1)
   {
     // get ADC measurement
-    int measurement = analogRead(A3);
+    int measurement = analogRead(A5);
     Serial.println(measurement);
     // enter into array
-    if (data_index < (setsize-2))
-    {
-       dataset[data_index++] = measurement;
-    }
-    else
-    {
-      push(dataset, setsize);
-      dataset[data_index] = measurement;
-    }
+    push(dataset, setsize);
+    dataset[0] = measurement;
+    
     Serial.print("data point: ");
     Serial.println(data_index);
     // plot
@@ -121,9 +82,8 @@ void loop(void) {
 void push(int *ary, int setsize)
 {
   int counter;
-  for (counter = 0; counter < setsize; counter++)
-    ary[counter] = ary[counter + 1];
-  ary[setsize] = ary[counter-1];  // this is a kludge to keep trash from getting stuck in the back end.  
+  for (counter = setsize-1; counter > -1; counter--)
+    ary[counter+1] = ary[counter];
 }
 unsigned long makegraph(uint16_t color, int *ary, int setsize)
 {
@@ -139,7 +99,9 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
   tft.setRotation(2);
   tft.drawLine(margin, height - margin, margin, margin, color);
   tft.drawLine(margin,margin,  width - margin, margin, color);
-  int stepsize = int((height - margin)/setsize-1);
+  int stepsize = int((height - margin)/setsize);
+  Serial.print("Stepsize: ");
+  Serial.println(stepsize);
   int lasty = margin;
   for (counter = 0; counter < setsize-1; counter++)
   {
