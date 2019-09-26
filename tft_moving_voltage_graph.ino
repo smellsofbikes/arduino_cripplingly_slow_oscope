@@ -30,7 +30,8 @@ Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
 void push(int *ary, int arysize);
 unsigned long makegraph(uint16_t color, int *ary, int setsize);
-int debug = 0;
+int debug = 1;
+int plottimer;          // I use this to time how long plot takes and subtract that from the sample time.
 
 void setup(void) {
   Serial.begin(9600);
@@ -73,13 +74,13 @@ void setup(void) {
 }
 
 void loop(void) {
-  int setsize = 56;                   // this determines how many samples are displayed on the screen
+  int setsize = 20;                   // this determines how many samples are displayed on the screen
   int dataset[setsize];
   int data_index = 0;
   int counter;
   for (counter = 0; counter < setsize; counter++)
     dataset[counter] = 0;
-  int sample_speed = 1000;            // this determines sample frequency: should be >300mS because of plot speed
+  int sample_speed = 3000;            // this determines sample frequency in uS: should be >300mS because of plot speed
   while(1)
   {
     // get ADC measurement
@@ -88,13 +89,23 @@ void loop(void) {
     // enter into array
     push(dataset, setsize);             // shift all elements in array over one
     dataset[0] = measurement;           // add new element to array
-    if (debug) { 
-      Serial.print("data point: ");
-      Serial.println(data_index);  }
+    
     // plot
     makegraph(BLACK, dataset, setsize);  // graph it
-    delay(sample_speed);
-  }
+    if (debug) { 
+      Serial.print("data point: ");
+      Serial.println(data_index);  
+      Serial.print("plot time: ");
+      Serial.println(plottimer); }
+      if (plottimer < sample_speed)  // Subtract plot time from sample frequency
+      {
+        delay(sample_speed - plottimer);
+        if (debug) {
+          Serial.print("pause time: ");
+          Serial.println(sample_speed - plottimer);
+        }
+      }
+   }
  }
 
 void push(int *ary, int setsize)
@@ -106,6 +117,7 @@ void push(int *ary, int setsize)
 unsigned long makegraph(uint16_t color, int *ary, int setsize)
 {
   int counter;
+  int scratch;
   int x1, y1, x2, y2, width = tft.width(), height = tft.height();
   if (debug) {
     Serial.print("width: ");
@@ -113,6 +125,7 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
     Serial.print(", height: ");
     Serial.println(height);  }
   int margin = 20;
+  scratch = millis();           // time how long plotting takes
  
   tft.fillScreen(WHITE);
   tft.setRotation(2);
@@ -156,4 +169,5 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
   tft.setCursor(60, 220);
   tft.println("time");
   tft.setRotation(2);
+  plottimer = millis() - scratch;
 }
