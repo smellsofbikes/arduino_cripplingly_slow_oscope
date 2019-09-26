@@ -20,12 +20,13 @@ Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 void push(int *ary, int arysize);
 unsigned long makegraph(uint16_t color, int *ary, int setsize);
 
+int debug = 0;
+
 void setup(void) {
   Serial.begin(9600);
   Serial.println(F("TFT LCD test"));
-
   Serial.print("TFT size is "); Serial.print(tft.width()); Serial.print("x"); Serial.println(tft.height());
-
+ 
   tft.reset();
 
   uint16_t identifier = tft.readID();
@@ -55,31 +56,32 @@ void setup(void) {
 }
 
 void loop(void) {
-  int setsize = 20;
+  int setsize = 56;              // this determines how many points get plotted on the screen at once.
   int dataset[setsize];
   int data_index = 0;
   int counter;
   for (counter = 0; counter < setsize; counter++)
     dataset[counter] = 0;
-  int sample_speed = 1000;
+  int sample_speed = 1000;       // this determines the sampling speed in milliseconds.  Probably limited to 300mS because of plot speed
   while(1)
   {
     // get ADC measurement
-    int measurement = analogRead(A5);
-    Serial.println(measurement);
+    int measurement = analogRead(A5);  // this should be put in hardware as a free-running fast ADC
+    if(debug) { Serial.println(measurement); }
     // enter into array
-    push(dataset, setsize);
-    dataset[0] = measurement;
+    push(dataset, setsize);            // shift datapoints in array over
+    dataset[0] = measurement;          // add newest data point to front of array
     
-    Serial.print("data point: ");
-    Serial.println(data_index);
+    if(debug) {
+      Serial.print("data point: ");
+      Serial.println(data_index);  }
     // plot
-    makegraph(BLACK, dataset, setsize);  
-    delay(sample_speed);
+    makegraph(BLACK, dataset, setsize); // plot it
+    delay(sample_speed);                // wait until next sample.
   }
  }
 
-void push(int *ary, int setsize)
+void push(int *ary, int setsize)  // shift all elements one place in the array
 {
   int counter;
   for (counter = setsize-1; counter > -1; counter--)
@@ -89,10 +91,10 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
 {
   int counter;
   int x1, y1, x2, y2, width = tft.width(), height = tft.height();
-  Serial.print("width: ");
+  if(debug) {Serial.print("width: "); {
   Serial.print(width);
   Serial.print(", height: ");
-  Serial.println(height);
+  Serial.println(height);  }
   int margin = 20;
  
   tft.fillScreen(WHITE);
@@ -100,8 +102,9 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
   tft.drawLine(margin, height - margin, margin, margin, color);
   tft.drawLine(margin,margin,  width - margin, margin, color);
   int stepsize = int((height - margin)/setsize);
-  Serial.print("Stepsize: ");
-  Serial.println(stepsize);
+  if(debug) { 
+    Serial.print("Stepsize: ");
+    Serial.println(stepsize);  }
   int lasty = margin;
   for (counter = 0; counter < setsize-1; counter++)
   {
@@ -111,16 +114,17 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
     x1 = (ary[counter] / 6)+ margin;
     x2 = (ary[counter+1] / 6)+ margin;
     tft.drawLine(x1, y1, x2, y2, BLUE);
-    Serial.print(counter);
-    Serial.print(" ");
-    Serial.print(x1);
-    Serial.print(" ");
-    Serial.print(x2);
-    Serial.print(" ");
-    Serial.print(y1);
-    Serial.print(" ");
-    Serial.print(y2);
-    Serial.println(" ");
+    if(debug) {
+      Serial.print(counter);
+      Serial.print(" ");
+      Serial.print(x1);
+      Serial.print(" ");
+      Serial.print(x2);
+      Serial.print(" ");
+      Serial.print(y1);
+      Serial.print(" ");
+      Serial.print(y2);
+      Serial.println(" ");  }
   }
   /* 0,0 is the bottom left corner */
   tft.setCursor( 60,5);
