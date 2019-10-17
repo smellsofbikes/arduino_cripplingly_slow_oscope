@@ -19,10 +19,10 @@
 const int chipSelect = 10;  // sdcard chip select
 
 // Assign human-readable names to some common 16-bit color values:
-#define	BLACK   0x0000
-#define	BLUE    0x001F
-#define	RED     0xF800
-#define	GREEN   0x07E0
+#define  BLACK   0x0000
+#define BLUE    0x001F
+#define RED     0xF800
+#define GREEN   0x07E0
 #define CYAN    0x07FF
 #define MAGENTA 0xF81F
 #define YELLOW  0xFFE0
@@ -32,8 +32,8 @@ Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 // If using the shield, all control and data lines are fixed, and
 
 void push(int *ary, int arysize);
-unsigned long makegraph(uint16_t color, int *ary, int setsize);
-void screen_setup(uint16_t backgroundColor, uint16_t penColor, int height, int width, int margin1, int margin2);
+unsigned long makegraph(uint16_t color, int *ary, int setsize, int data_pointer);
+void screen_setup(uint16_t backgroundColor, uint16_t penColor, int margin1, int margin2);
 void graph_erase_data(uint16_t penColor, int x1, int x2, int y1, int y2);
 int fileExists(char buffer[10]);
 
@@ -85,47 +85,34 @@ void setup(void) {
   {
     Serial.println("Card failure!");
   }
+
+  screen_setup(WHITE, BLACK, 20, 20);  // clear screen, plot white, plot black axes, label
 }
 
 void loop(void) {
   int setsize = 56;                   // this determines how many samples are displayed on the screen
   int dataset[setsize];
   int data_index = 0;
-  int counter;
-  int filename;
-  char namebuffer[10];
-  filename = sprintf(namebuffer, "data.txt");
-  for (counter = 0; counter < setsize; counter++)
+  int counter, filename;
+  char namebuffer[14];                // buffer for sdcard name
+  
+  filename = sprintf(namebuffer, "vdata.txt");      // arbitrary datafile name
+  for (counter = 0; counter < setsize; counter++)   // zero out data array
     dataset[counter] = 0;
-  int sample_speed = 1500;            // this determines sample frequency in uS: should be >300mS because of plot speed
+  
   while(1)
   {
-    // get ADC measurement
     int measurement = analogRead(A5);    // this should be set up in hardware as a fast free-running ADC
     if (debug) {  Serial.println(measurement); }
-    // enter into array
     push(dataset, setsize);             // shift all elements in array over one
     dataset[0] = measurement;           // add new element to array
     File dataFile = SD.open(namebuffer, FILE_WRITE);
     dataFile.println(measurement);
     dataFile.close();
-    // plot
-    makegraph(BLACK, dataset, setsize);  // graph it
-    if (debug) { 
-      Serial.print("data point: ");
-      Serial.println(data_index);  
-      Serial.print("plot time: ");
-      Serial.println(plottimer); }
-      if (plottimer < sample_speed)  // Subtract plot time from sample frequency
-      {
-        delay(sample_speed - plottimer);
-        if (debug) {
-          Serial.print("pause time: ");
-          Serial.println(sample_speed - plottimer);
-        }
-      }
-   }
- }
+    graph_erase_data(WHITE, 21, 21, tft.width(), tft.height());
+    plotgraph(BLACK, dataset, setsize, data_index);  // graph it
+  }
+}
 
 void push(int *ary, int setsize)
 {
@@ -133,7 +120,9 @@ void push(int *ary, int setsize)
   for (counter = setsize-1; counter > -1; counter--)
     ary[counter+1] = ary[counter];
 }
-unsigned long makegraph(uint16_t color, int *ary, int setsize)
+
+//plotgraph
+unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_pointer)
 {
   int counter;
   int scratch;
@@ -142,14 +131,10 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
     Serial.print("width: ");
     Serial.print(width);
     Serial.print(", height: ");
-    Serial.println(height);  }
+    Serial.println(height);
+    scratch = millis();           // time how long plotting takes
+    }
   int margin = 20;
-  scratch = millis();           // time how long plotting takes
- 
-  tft.fillScreen(WHITE);
-  tft.setRotation(2);
-  tft.drawLine(margin, height - margin, margin, margin, color);
-  tft.drawLine(margin,margin,  width - margin, margin, color);
   int stepsize = int((height - margin)/setsize);
   if (debug) {
     Serial.print("Stepsize: ");
@@ -157,6 +142,7 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
   }
   
   int lasty = margin;
+  tft.setRotation(2);
   for (counter = 0; counter < setsize-1; counter++)
   {
     y1 = lasty;
@@ -165,7 +151,7 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
     x1 = (ary[counter] / 6)+ margin;
     x2 = (ary[counter+1] / 6)+ margin;
     tft.drawLine(x1, y1, x2, y2, BLUE);
-    if (debug) {
+    if (debug == 2) {
       Serial.print(counter);
       Serial.print(" ");
       Serial.print(x1);
@@ -178,14 +164,21 @@ unsigned long makegraph(uint16_t color, int *ary, int setsize)
       Serial.println(" ");
     }
   }
-  /* 0,0 is the bottom left corner */
-  plottimer = millis() - scratch;
+  if (debug)
+  {
+    plottimer = millis() - scratch;
+    Serial.print("plot time: ");
+    Serial.println(plottimer);
+  }
 }
 
-void screen_setup(uint16_t backgroundColor, uint16_t penColor, int height, int width, int margin1, int margin2)
-{
+//clear screen and draw and label axes
 
-  width = tft.width(), height = tft.height();
+void screen_setup(uint16_t backgroundColor, uint16_t penColor, int margin1, int margin2)
+{
+  int scratch = millis();
+  int width = tft.width();
+  int height = tft.height();
   tft.fillScreen(backgroundColor);
   tft.setRotation(2);
   tft.drawLine(margin1, height - margin2, margin1, margin2, penColor);
@@ -200,11 +193,25 @@ void screen_setup(uint16_t backgroundColor, uint16_t penColor, int height, int w
   tft.setCursor(60, 220);
   tft.println("time");
   tft.setRotation(2);
+  int setup_time = millis() - scratch;
+  if (debug)
+  {
+    Serial.print("setup plot time: ");
+    Serial.println(setup_time);
+  }
 }
 
-void graph_erase_data(uint16_t penColor, int x1, int x2, int y1, int y2)
+void graph_erase_data(uint16_t penColor, int x1, int y1, int x2, int y2)
 {
+  int scratch, erase_time;
+  if (debug) { scratch = millis(); }
   tft.fillRect(x1, y1, x2, y2, penColor);
+  if (debug)
+  {
+    erase_time = millis()-scratch;
+    Serial.print("erase plot time: ");
+    Serial.println(erase_time);
+  }
 }
 
 int fileExists(char buffer[10])
@@ -215,4 +222,5 @@ int fileExists(char buffer[10])
   fclose(fp);
   return(1);
 }
+
 
