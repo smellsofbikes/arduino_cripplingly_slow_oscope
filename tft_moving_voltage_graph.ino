@@ -31,12 +31,12 @@ const int chipSelect = 10;  // sdcard chip select
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
 void push(int *ary, int arysize);
-unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_pointer);
+unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_pointer, int stepwidth);
 void screen_setup(uint16_t backgroundColor, uint16_t penColor, int margin1, int margin2);
 void graph_erase_data(uint16_t penColor, int x1, int x2, int y1, int y2);
 int fileExists(char buffer[10]);
 
-int debug = 1;
+int debug = 0;
 
 void setup(void) {
   Serial.begin(9600);
@@ -83,7 +83,7 @@ void loop(void) {
   int setsize = 56;                   // this determines how many samples are displayed on the screen
   int dataset[setsize];
   int data_index = 0;
-  int counter, filename;
+  int counter, filename, stepwidth = 0;
   char namebuffer[14];                // buffer for sdcard name
   
   filename = sprintf(namebuffer, "vdata.txt");      // arbitrary datafile name
@@ -100,7 +100,7 @@ void loop(void) {
     dataFile.println(measurement);
     dataFile.close();
     graph_erase_data(WHITE, 21, 21, tft.width(), tft.height());
-    plotgraph(BLACK, dataset, setsize, data_index);  // graph it
+    plotgraph(BLACK, dataset, setsize, data_index, stepwidth);  // graph it
   }
 }
 
@@ -111,10 +111,9 @@ void push(int *ary, int setsize)
     ary[counter+1] = ary[counter];
 }
 
-unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_pointer)
+unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_pointer, int stepwidth)
 {
-  int counter;
-  int scratch;
+  int counter, scratch, plottimer;
   int x1, y1, x2, y2, width = tft.width(), height = tft.height();
   if (debug) {
     Serial.print("width: ");
@@ -210,5 +209,3 @@ int fileExists(char buffer[10])
   fclose(fp);
   return(1);
 }
-
-
