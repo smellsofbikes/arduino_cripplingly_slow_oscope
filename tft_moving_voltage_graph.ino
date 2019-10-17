@@ -29,20 +29,16 @@ const int chipSelect = 10;  // sdcard chip select
 #define WHITE   0xFFFF
 
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
-// If using the shield, all control and data lines are fixed, and
 
 void push(int *ary, int arysize);
-unsigned long makegraph(uint16_t color, int *ary, int setsize, int data_pointer);
+unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_pointer);
 void screen_setup(uint16_t backgroundColor, uint16_t penColor, int margin1, int margin2);
 void graph_erase_data(uint16_t penColor, int x1, int x2, int y1, int y2);
 int fileExists(char buffer[10]);
 
-
 int debug = 1;
-int plottimer;          // I use this to time how long plot takes and subtract that from the sample time.
 
 void setup(void) {
-
   Serial.begin(9600);
   Serial.println(F("TFT LCD test"));
 
@@ -53,9 +49,7 @@ void setup(void) {
 #endif
 
   Serial.print("TFT size is "); Serial.print(tft.width()); Serial.print("x"); Serial.println(tft.height());
-
   tft.reset();
-
   uint16_t identifier = tft.readID();
 
   if(identifier == 0x9325) {
@@ -81,11 +75,7 @@ void setup(void) {
   }
   tft.begin(identifier);
 
-  if (!SD.begin(chipSelect))
-  {
-    Serial.println("Card failure!");
-  }
-
+  if (!SD.begin(chipSelect)) {  Serial.println("Card failure!"); }
   screen_setup(WHITE, BLACK, 20, 20);  // clear screen, plot white, plot black axes, label
 }
 
@@ -121,7 +111,6 @@ void push(int *ary, int setsize)
     ary[counter+1] = ary[counter];
 }
 
-//plotgraph
 unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_pointer)
 {
   int counter;
@@ -173,7 +162,6 @@ unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_point
 }
 
 //clear screen and draw and label axes
-
 void screen_setup(uint16_t backgroundColor, uint16_t penColor, int margin1, int margin2)
 {
   int scratch = millis();
