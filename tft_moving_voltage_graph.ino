@@ -39,6 +39,10 @@ int fileExists(char buffer[10]);
 int debug = 0;
 
 void setup(void) {
+  //SREG = SREG | 0b10000000;      //enable global interrupts
+  //ADMUX = 0b10100101;            //vref, left-justified, ADC5
+  //ADCSRA = 0b11101111;           //enable adc, enable interrupt, prescalar 128
+ 
   Serial.begin(9600);
   Serial.println(F("TFT LCD test"));
 
@@ -102,6 +106,13 @@ void loop(void) {
     graph_erase_data(WHITE, 21, 21, tft.width(), tft.height());
     plotgraph(BLACK, dataset, setsize, data_index, stepwidth);  // graph it
   }
+}
+
+ISR(ADC_vect) {
+//  int measurement = ADCH;
+//  if (data_pointer > setsize)
+//    data_pointer = 0;
+//  dataset[data_pointer] = measurement;
 }
 
 void push(int *ary, int setsize)
