@@ -31,17 +31,20 @@ const int chipSelect = 10;  // sdcard chip select
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
 void push(int *ary, int arysize);
-unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_pointer, int stepwidth);
+unsigned long plotgraph(uint16_t color, int *ary, int setsize, int data_index, int stepwidth);
 void screen_setup(uint16_t backgroundColor, uint16_t penColor, int margin1, int margin2);
 void graph_erase_data(uint16_t penColor, int x1, int x2, int y1, int y2);
 int fileExists(char buffer[10]);
 
 int debug = 0;
+byte Gsetsize = 56;
+byte Gdataset[56];
+byte Gdataset_pointer = 0;
 
 void setup(void) {
-  //SREG = SREG | 0b10000000;      //enable global interrupts
-  //ADMUX = 0b10100101;            //vref, left-justified, ADC5
-  //ADCSRA = 0b11101111;           //enable adc, enable interrupt, prescalar 128
+  SREG = SREG | 0b10000000;      //enable global interrupts
+  ADMUX = 0b10100101;            //vref, left-justified, ADC5
+  ADCSRA = 0b11101111;           //enable adc, enable interrupt, prescalar 128
  
   Serial.begin(9600);
   Serial.println(F("TFT LCD test"));
@@ -86,33 +89,40 @@ void setup(void) {
 void loop(void) {
   int setsize = 56;                   // this determines how many samples are displayed on the screen
   int dataset[setsize];
-  int data_index = 0;
+  int data_index;
   int counter, filename, stepwidth = 0;
   char namebuffer[14];                // buffer for sdcard name
   
   filename = sprintf(namebuffer, "vdata.txt");      // arbitrary datafile name
-  for (counter = 0; counter < setsize; counter++)   // zero out data array
-    dataset[counter] = 0;
   
   while(1)
   {
-    int measurement = analogRead(A5);    // this should be set up in hardware as a fast free-running ADC
+    //int measurement = analogRead(A5);    // this should be set up in hardware as a fast free-running ADC
     if (debug) {  Serial.println(measurement); }
-    push(dataset, setsize);             // shift all elements in array over one
-    dataset[0] = measurement;           // add new element to array
+    //push(dataset, setsize);             // shift all elements in array over one
+    Gdataset[Gdataset_pointer] = measurement;           // add new element to array
     File dataFile = SD.open(namebuffer, FILE_WRITE);
     dataFile.println(measurement);
     dataFile.close();
     graph_erase_data(WHITE, 21, 21, tft.width(), tft.height());
-    plotgraph(BLACK, dataset, setsize, data_index, stepwidth);  // graph it
+    cli();
+    int datapointer_mirror = Gdataset_pointer;
+    for (counter = 0; counter < Gsetsize; counter++)
+    {
+      if (datapointer_mirror > Gsetsize) datapointer_mirror = 0;
+      dataset[counter] = Gdataset[datapointer_mirror];           // make new datset starting at 0
+    }
+    sei();
+    data_index = 0;
+    plotgraph(BLACK, dataset, Gsetsize, data_index, stepwidth);  // graph it
   }
 }
 
 ISR(ADC_vect) {
-//  int measurement = ADCH;
-//  if (data_pointer > setsize)
-//    data_pointer = 0;
-//  dataset[data_pointer] = measurement;
+  int measurement = ADCH;
+  if (Gdataset_pointer > Gsetsize-1)
+    Gdata_pointer = 0;
+  Gdataset[Gdataset_pointer] = measurement;
 }
 
 void push(int *ary, int setsize)
@@ -122,9 +132,9 @@ void push(int *ary, int setsize)
     ary[counter+1] = ary[counter];
 }
 
-unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_pointer, int stepwidth)
+unsigned long plotgraph(uint16_t color, int *ary, int setsize, int data_index, int stepwidth)
 {
-  int counter, scratch, plottimer;
+  int counter, scratch, plottimer, index;
   int x1, y1, x2, y2, width = tft.width(), height = tft.height();
   if (debug) {
     Serial.print("width: ");
@@ -142,8 +152,8 @@ unsigned long plotgraph(uint16_t color, int *ary, int setsize, int dataset_point
   
   int lasty = margin;
   tft.setRotation(2);
-  for (counter = 0; counter < setsize-1; counter++)
-  {
+
+  for (counter = 0; counter < setsize; counter++)
     y1 = lasty;
     y2 = lasty + stepsize;
     lasty = y2;
