@@ -19,7 +19,7 @@
 const int chipSelect = 10;  // sdcard chip select
 
 // Assign human-readable names to some common 16-bit color values:
-#define  BLACK   0x0000
+#define BLACK   0x0000
 #define BLUE    0x001F
 #define RED     0xF800
 #define GREEN   0x07E0
@@ -36,10 +36,10 @@ void screen_setup(uint16_t backgroundColor, uint16_t penColor, int margin1, int 
 void graph_erase_data(uint16_t penColor, int x1, int x2, int y1, int y2);
 int fileExists(char buffer[10]);
 
-int debug = 0;
-byte Gsetsize = 56;
-byte Gdataset[56];
-byte Gdataset_pointer = 0;
+int debug = 0;                    // three levels: 0 is no serial, 1 is serial prints of registers, 2 is print of dataset
+byte Gsetsize = 56;               //sizeof dataset
+byte Gdataset[56];                //dataset that is accessed by ADC_ISR
+byte Gdataset_pointer = 0;        //pointer to oldest array element in dataset
 
 void setup(void) {
   SREG = SREG | 0b10000000;      //enable global interrupts
@@ -87,30 +87,33 @@ void setup(void) {
 }
 
 void loop(void) {
-  int setsize = 56;                   // this determines how many samples are displayed on the screen
-  int dataset[setsize];
-  int data_index;
-  int counter, filename, stepwidth = 0;
-  char namebuffer[14];                // buffer for sdcard name
-  
-  filename = sprintf(namebuffer, "vdata.txt");      // arbitrary datafile name
-  
-  while(1)
+  int setsize = Gsetsize;             // this determines how many samples are displayed on the screen
+  int dataset[setsize];               // duplicate of global set, created to hand off to plot function
+  int data_index;                     // pointer to dataset array location
+  int counter, stepwidth = 0;
+  char namebuffer[] = "log00.txt";
+  for (int i = 0; i < 100; i++)       // neat bit of code from adafruit to make unique names rather than overwriting
   {
-    //int measurement = analogRead(A5);    // this should be set up in hardware as a fast free-running ADC
-    if (debug) {  Serial.println(measurement); }
-    //push(dataset, setsize);             // shift all elements in array over one
-    Gdataset[Gdataset_pointer] = measurement;           // add new element to array
-    File dataFile = SD.open(namebuffer, FILE_WRITE);
-    dataFile.println(measurement);
+    namebuffer[4] = i/10 + '0';
+    namebuffer[5] = i%10 + '0';
+    if (! SD.exists(namebuffer)) 
+    {
+      break; 
+    }
+  }
+  
+  while(1)          // this is the main loop: save most recent piece of data to SDcard, copy dataset, plot it.
+  {
+    File dataFile = SD.open(namebuffer, FILE_WRITE);  // It may be slow to do this every time, but it guarantees closure
+    dataFile.println(Gdataset[Gdataset_pointer]);
     dataFile.close();
-    graph_erase_data(WHITE, 21, 21, tft.width(), tft.height());
-    cli();
-    int datapointer_mirror = Gdataset_pointer;
+    graph_erase_data(WHITE, 21, 21, tft.width(), tft.height());   // write a blank over just the graphed area to clear it
+    cli();                                               // turn off interrupts to clone dataset
+    data_index = Gdataset_pointer;
     for (counter = 0; counter < Gsetsize; counter++)
     {
-      if (datapointer_mirror > Gsetsize) datapointer_mirror = 0;
-      dataset[counter] = Gdataset[datapointer_mirror];           // make new datset starting at 0
+      if (data_index > Gsetsize) data_index = 0;
+      dataset[counter] = Gdataset[data_index];           // make new datset starting at 0
     }
     sei();
     data_index = 0;
@@ -119,20 +122,20 @@ void loop(void) {
 }
 
 ISR(ADC_vect) {
-  int measurement = ADCH;
-  if (Gdataset_pointer > Gsetsize-1)
+  int measurement = ADCH;             // only need left 8 bits
+  if (Gdataset_pointer > Gsetsize-1)  // check for pointer out of array bound
     Gdata_pointer = 0;
   Gdataset[Gdataset_pointer] = measurement;
 }
 
-void push(int *ary, int setsize)
+void push(int *ary, int setsize)      // should not need this anymore
 {
   int counter;
   for (counter = setsize-1; counter > -1; counter--)
     ary[counter+1] = ary[counter];
 }
 
-unsigned long plotgraph(uint16_t color, int *ary, int setsize, int data_index, int stepwidth)
+unsigned long plotgraph(uint16_t penColor, int *ary, int setsize, int data_index, int stepwidth)
 {
   int counter, scratch, plottimer, index;
   int x1, y1, x2, y2, width = tft.width(), height = tft.height();
@@ -144,7 +147,7 @@ unsigned long plotgraph(uint16_t color, int *ary, int setsize, int data_index, i
     scratch = millis();           // time how long plotting takes
     }
   int margin = 20;
-  int stepsize = int((height - margin)/setsize);
+  int stepsize = int((height - margin)/setsize);   // I'm still calculating this locally.  It should be computed once and passed in
   if (debug) {
     Serial.print("Stepsize: ");
     Serial.println(stepsize);
@@ -157,9 +160,9 @@ unsigned long plotgraph(uint16_t color, int *ary, int setsize, int data_index, i
     y1 = lasty;
     y2 = lasty + stepsize;
     lasty = y2;
-    x1 = (ary[counter] / 6)+ margin;
+    x1 = (ary[counter] / 6)+ margin;    // the magic '6' here is a rough raw adc to tft.height() ratio.
     x2 = (ary[counter+1] / 6)+ margin;
-    tft.drawLine(x1, y1, x2, y2, BLUE);
+    tft.drawLine(x1, y1, x2, y2, penColor);
     if (debug == 2) {
       Serial.print(counter);
       Serial.print(" ");
@@ -181,7 +184,7 @@ unsigned long plotgraph(uint16_t color, int *ary, int setsize, int data_index, i
   }
 }
 
-//clear screen and draw and label axes
+//clear screen and draw and label axes, run once from setup()
 void screen_setup(uint16_t backgroundColor, uint16_t penColor, int margin1, int margin2)
 {
   int scratch = millis();
@@ -220,13 +223,4 @@ void graph_erase_data(uint16_t penColor, int x1, int y1, int x2, int y2)
     Serial.print("erase plot time: ");
     Serial.println(erase_time);
   }
-}
-
-int fileExists(char buffer[10])
-{
-  FILE *fp;
-  if((fp = fopen(buffer, "r")) == NULL)
-    return(0);
-  fclose(fp);
-  return(1);
 }
