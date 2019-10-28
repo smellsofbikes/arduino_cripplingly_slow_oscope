@@ -122,7 +122,7 @@ void loop(void) {
 ISR(ADC_vect) {
   uint8_t measurement = ADCH;             // only need left 8 bits
   if (Gdataset_pointer > Gsetsize-1)  // check for pointer out of array bound
-    Gdata_pointer = 0;
+    Gdataset_pointer = 0;
   Gdataset[Gdataset_pointer] = measurement;
 }
 
@@ -132,21 +132,22 @@ void push(uint8_t *ary, uint8_t setsize)      // should not need this anymore
   for (counter = setsize-1; counter > -1; counter--)
     ary[counter+1] = ary[counter];
 }
-
-unsigned long plotgraph(uint16_t penColor, uint8_t *ary, uint8_t setsize, uint8_t data_index, uint8_t stepwidth)
+uint8_t plotgraph(uint16_t penColor, uint8_t *ary, uint8_t setsize, uint8_t data_index, uint8_t stepwidth)
 {
   int counter, scratch, plottimer, index;
   int x1, y1, x2, y2, width = tft.width(), height = tft.height();
-  if (debug) {
+  if (debug) 
+  {
     Serial.print("width: ");
     Serial.print(width);
     Serial.print(", height: ");
     Serial.println(height);
     scratch = millis();           // time how long plotting takes
-    }
+  }
   uint8_t margin = 20;
   uint8_t stepsize = uint8_t((height - margin)/setsize);   // I'm still calculating this locally.  It should be computed once and passed in
-  if (debug) {
+  if (debug) 
+  {
     Serial.print("Stepsize: ");
     Serial.println(stepsize);
   }
@@ -155,6 +156,7 @@ unsigned long plotgraph(uint16_t penColor, uint8_t *ary, uint8_t setsize, uint8_
   tft.setRotation(2);
 
   for (counter = 0; counter < setsize; counter++)
+  {
     y1 = lasty;
     y2 = lasty + stepsize;
     lasty = y2;
