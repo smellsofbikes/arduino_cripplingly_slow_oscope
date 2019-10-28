@@ -88,9 +88,18 @@ void loop(void) {
   int dataset[setsize];
   int data_index = 0;
   int counter, filename, stepwidth = 0;
-  char namebuffer[14];                // buffer for sdcard name
+  char namebuffer[] = "log00.txt";        // buffer for sdcard name
+  for (uint8_t i = 0; i < 100; i++)       // neat bit of code from adafruit to make unique names rather than overwriting
+  {
+    namebuffer[3] = i/10 + '0';
+    namebuffer[4] = i%10 + '0';
+    if (! SD.exists(namebuffer)) 
+    {
+      if(debug) { Serial.print("Datalog name: "); Serial.println(namebuffer); }
+      break; 
+    }
+  }
   
-  filename = sprintf(namebuffer, "vdata.txt");      // arbitrary datafile name
   for (counter = 0; counter < setsize; counter++)   // zero out data array
     dataset[counter] = 0;
   
