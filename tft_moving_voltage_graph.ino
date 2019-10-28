@@ -30,16 +30,14 @@ const int chipSelect = 10;  // sdcard chip select
 
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
-void push(int *ary, int arysize);
-unsigned long plotgraph(uint16_t color, int *ary, int setsize, int data_index, int stepwidth);
+uint8_t plotgraph(uint16_t color, uint8_t *ary, uint8_t setsize, uint8_t data_index, uint8_t stepwidth);
 void screen_setup(uint16_t backgroundColor, uint16_t penColor, int margin1, int margin2);
 void graph_erase_data(uint16_t penColor, int x1, int x2, int y1, int y2);
-int fileExists(char buffer[10]);
 
-int debug = 0;                    // three levels: 0 is no serial, 1 is serial prints of registers, 2 is print of dataset
-byte Gsetsize = 56;               //sizeof dataset
-byte Gdataset[56];                //dataset that is accessed by ADC_ISR
-byte Gdataset_pointer = 0;        //pointer to oldest array element in dataset
+uint8_t debug = 0;                    // three levels: 0 is no serial, 1 is serial prints of registers, 2 is print of dataset
+uint8_t Gsetsize = 56;               //sizeof dataset
+uint8_t Gdataset[56];                //dataset that is accessed by ADC_ISR
+uint8_t Gdataset_pointer = 0;        //pointer to oldest array element in dataset
 
 void setup(void) {
   SREG = SREG | 0b10000000;      //enable global interrupts
@@ -87,12 +85,12 @@ void setup(void) {
 }
 
 void loop(void) {
-  int setsize = Gsetsize;             // this determines how many samples are displayed on the screen
-  int dataset[setsize];               // duplicate of global set, created to hand off to plot function
-  int data_index;                     // pointer to dataset array location
-  int counter, stepwidth = 0;
+  uint8_t setsize = Gsetsize;             // this determines how many samples are displayed on the screen
+  uint8_t dataset[setsize];               // duplicate of global set, created to hand off to plot function
+  uint8_t data_index;                     // pointer to dataset array location
+  uint8_t counter, stepwidth = 0;
   char namebuffer[] = "log00.txt";
-  for (int i = 0; i < 100; i++)       // neat bit of code from adafruit to make unique names rather than overwriting
+  for (uint8_t i = 0; i < 100; i++)       // neat bit of code from adafruit to make unique names rather than overwriting
   {
     namebuffer[4] = i/10 + '0';
     namebuffer[5] = i%10 + '0';
@@ -122,20 +120,20 @@ void loop(void) {
 }
 
 ISR(ADC_vect) {
-  int measurement = ADCH;             // only need left 8 bits
+  uint8_t measurement = ADCH;             // only need left 8 bits
   if (Gdataset_pointer > Gsetsize-1)  // check for pointer out of array bound
     Gdata_pointer = 0;
   Gdataset[Gdataset_pointer] = measurement;
 }
 
-void push(int *ary, int setsize)      // should not need this anymore
+void push(uint8_t *ary, uint8_t setsize)      // should not need this anymore
 {
-  int counter;
+  uint8_t counter;
   for (counter = setsize-1; counter > -1; counter--)
     ary[counter+1] = ary[counter];
 }
 
-unsigned long plotgraph(uint16_t penColor, int *ary, int setsize, int data_index, int stepwidth)
+unsigned long plotgraph(uint16_t penColor, uint8_t *ary, uint8_t setsize, uint8_t data_index, uint8_t stepwidth)
 {
   int counter, scratch, plottimer, index;
   int x1, y1, x2, y2, width = tft.width(), height = tft.height();
@@ -146,14 +144,14 @@ unsigned long plotgraph(uint16_t penColor, int *ary, int setsize, int data_index
     Serial.println(height);
     scratch = millis();           // time how long plotting takes
     }
-  int margin = 20;
-  int stepsize = int((height - margin)/setsize);   // I'm still calculating this locally.  It should be computed once and passed in
+  uint8_t margin = 20;
+  uint8_t stepsize = uint8_t((height - margin)/setsize);   // I'm still calculating this locally.  It should be computed once and passed in
   if (debug) {
     Serial.print("Stepsize: ");
     Serial.println(stepsize);
   }
   
-  int lasty = margin;
+  uint8_t lasty = margin;
   tft.setRotation(2);
 
   for (counter = 0; counter < setsize; counter++)
